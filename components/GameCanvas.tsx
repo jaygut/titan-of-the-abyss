@@ -25,7 +25,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
   // Configuration
   const SEGMENT_COUNT = 24; 
   const SEGMENT_SPACING = 18;
-  const PREY_COUNT = 30; // Increased count
+  const PREY_COUNT = 35; 
   const JELLY_COUNT = 6;
   const SEAWEED_COUNT = 40;
 
@@ -86,8 +86,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
           y: y ?? (Math.random() * window.innerHeight)
       };
 
-      if (rand < 0.5) {
-          // 50% Lanternfish
+      if (rand < 0.45) {
+          // 45% Lanternfish
           return {
             id: Math.random().toString(36),
             type: PreyType.LANTERNFISH,
@@ -97,26 +97,49 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
             color: '#aaddff',
             angle: 0
           };
-      } else if (rand < 0.8) {
-          // 30% Ammonite (Slower, tankier)
+      } else if (rand < 0.65) {
+          // 20% Ammonite (Slower, tankier)
           return {
             id: Math.random().toString(36),
             type: PreyType.AMMONITE,
             position: pos,
             velocity: { x: (Math.random() - 0.5) * 1.5, y: (Math.random() - 0.5) * 1.5 },
-            radius: 12, // Bigger
-            color: '#cdb499', // Shell color
+            radius: 12, 
+            color: '#cdb499',
             angle: 0
           };
-      } else {
-          // 20% Vampire Squid (Drifts, bursts)
+      } else if (rand < 0.8) {
+          // 15% Vampire Squid (Drifts, bursts)
           return {
             id: Math.random().toString(36),
             type: PreyType.SQUID,
             position: pos,
             velocity: { x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2 },
             radius: 10,
-            color: '#660000', // Deep red
+            color: '#660000',
+            angle: 0,
+            tailPhase: Math.random() * Math.PI
+          };
+      } else if (rand < 0.9) {
+          // 10% Anglerfish (Lurker)
+          return {
+            id: Math.random().toString(36),
+            type: PreyType.ANGLERFISH,
+            position: pos,
+            velocity: { x: (Math.random() - 0.5) * 1, y: (Math.random() - 0.5) * 0.5 },
+            radius: 14,
+            color: '#221100',
+            angle: 0
+          };
+      } else {
+          // 10% Gulper Eel (Serpentine)
+          return {
+            id: Math.random().toString(36),
+            type: PreyType.GULPER_EEL,
+            position: pos,
+            velocity: { x: (Math.random() - 0.5) * 2.5, y: (Math.random() - 0.5) * 1 },
+            radius: 11,
+            color: '#111111',
             angle: 0,
             tailPhase: Math.random() * Math.PI
           };
@@ -126,8 +149,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
   // --- Input Handling ---
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    // Only update if keys aren't actively driving, or to just update reference
-    // We update reference but the game loop decides priority
     mouseRef.current = { x: e.clientX, y: e.clientY };
   }, []);
 
@@ -268,11 +289,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
 
         // PREDATION: Eat check
         // Larger prey needs slightly closer bite
-        const biteRadius = prey.radius + 50; 
+        const biteRadius = prey.radius + 60; 
         if (distToHead < biteRadius) {
           soundService.play(SoundType.EAT);
           // Score depends on type
-          const points = prey.type === PreyType.AMMONITE ? 3 : (prey.type === PreyType.SQUID ? 2 : 1);
+          let points = 1;
+          if (prey.type === PreyType.AMMONITE) points = 3;
+          if (prey.type === PreyType.SQUID) points = 2;
+          if (prey.type === PreyType.ANGLERFISH) points = 4;
+          if (prey.type === PreyType.GULPER_EEL) points = 5;
+
           onScoreUpdate(points);
           
           // Blood/Debris
@@ -293,8 +319,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
 
         // Behavior: Flee or Move
         let fleeSpeed = 1.0;
-        if (prey.type === PreyType.AMMONITE) fleeSpeed = 0.5;
-        if (prey.type === PreyType.SQUID) fleeSpeed = 1.2;
+        if (prey.type === PreyType.AMMONITE || prey.type === PreyType.ANGLERFISH) fleeSpeed = 0.5;
+        if (prey.type === PreyType.SQUID || prey.type === PreyType.GULPER_EEL) fleeSpeed = 1.2;
 
         if (isRoaring) {
            prey.velocity.x += (prey.position.x - titanHeadPos.x) / distToHead * 1.5 * fleeSpeed;
@@ -305,8 +331,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
         }
 
         // Natural movement updates
-        if (prey.type === PreyType.SQUID) {
-            // Squid bursts
+        if (prey.type === PreyType.SQUID || prey.type === PreyType.GULPER_EEL) {
+            // Bursts/Undulation
             if (Math.random() < 0.02) {
                 prey.velocity.x += (Math.random()-0.5) * 5;
                 prey.velocity.y += (Math.random()-0.5) * 5;
@@ -323,7 +349,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
 
         // Min Speed Check
         const speed = Math.hypot(prey.velocity.x, prey.velocity.y);
-        const minSpeed = prey.type === PreyType.AMMONITE ? 0.5 : 2;
+        const minSpeed = (prey.type === PreyType.AMMONITE || prey.type === PreyType.ANGLERFISH) ? 0.3 : 2;
         if (speed < minSpeed) {
             prey.velocity.x += (Math.random() - 0.5) * 0.5;
             prey.velocity.y += (Math.random() - 0.5) * 0.5;
@@ -341,10 +367,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
         // --- RENDER PREY ---
         ctx.save();
         ctx.translate(prey.position.x, prey.position.y);
-        ctx.rotate(prey.angle); // Angle matches velocity direction
+        ctx.rotate(prey.angle); 
         
         if (prey.type === PreyType.LANTERNFISH) {
-            // Rotated PI to face correct way for fish sprite logic
             ctx.rotate(Math.PI);
             ctx.fillStyle = '#b0c4de';
             ctx.beginPath();
@@ -369,26 +394,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
             ctx.beginPath(); ctx.arc(-5, -1.5, 0.8, 0, Math.PI*2); ctx.fill();
 
         } else if (prey.type === PreyType.AMMONITE) {
-            // Spiral Shell
-            // Ammonites swim backwards, shell first. Velocity aligns to movement.
-            // So shell should be "front" in velocity terms? No, they jet backwards.
-            // Let's assume standard swimming visual: Tentacles trailing.
-            
-            // Draw Shell (Spiral approximation)
             ctx.fillStyle = '#cdb499';
             ctx.strokeStyle = '#8b7355';
             ctx.lineWidth = 2;
             
             ctx.beginPath();
-            ctx.arc(0, 0, 10, 0, Math.PI * 2); // Main chamber
+            ctx.arc(0, 0, 10, 0, Math.PI * 2);
             ctx.fill(); ctx.stroke();
             
             ctx.beginPath();
-            ctx.arc(-6, 2, 7, 0, Math.PI * 2); // Inner whorl
+            ctx.arc(-6, 2, 7, 0, Math.PI * 2); 
             ctx.fill(); ctx.stroke();
 
-            // Tentacles (Trailing behind, opposite to velocity which is angle 0)
-            ctx.rotate(Math.PI); // Face backwards
+            ctx.rotate(Math.PI); 
             ctx.strokeStyle = '#cdb499';
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -399,27 +417,21 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
             ctx.stroke();
 
         } else if (prey.type === PreyType.SQUID) {
-            // Vampire Squid
-            // Pointy mantle, webbed arms
-            ctx.rotate(-Math.PI/2); // Fix rotation to point velocity up relative to drawing
-            
-            // Mantle (Deep Red)
+            ctx.rotate(-Math.PI/2); 
             ctx.fillStyle = '#660000';
             ctx.beginPath();
-            ctx.moveTo(0, -12); // Tip
-            ctx.bezierCurveTo(8, -5, 8, 5, 0, 8); // Right side
-            ctx.bezierCurveTo(-8, 5, -8, -5, 0, -12); // Left side
+            ctx.moveTo(0, -12); 
+            ctx.bezierCurveTo(8, -5, 8, 5, 0, 8); 
+            ctx.bezierCurveTo(-8, 5, -8, -5, 0, -12); 
             ctx.fill();
 
-            // Web/Tentacles (Trailing)
-            ctx.fillStyle = '#440000'; // Darker web
+            ctx.fillStyle = '#440000'; 
             ctx.beginPath();
             ctx.moveTo(-6, 5);
             ctx.lineTo(6, 5);
-            ctx.lineTo(0, 15 + Math.sin(time*10)*3); // Pulsing tip
+            ctx.lineTo(0, 15 + Math.sin(time*10)*3); 
             ctx.fill();
 
-            // Glowing Eyes (Blue)
             if (bioluminescence) {
                 ctx.fillStyle = '#4488ff';
                 ctx.shadowBlur = 15;
@@ -430,6 +442,72 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
+        } else if (prey.type === PreyType.ANGLERFISH) {
+            // Anglerfish Logic
+            ctx.rotate(Math.PI);
+            ctx.fillStyle = '#1a0a00'; // Dark brown
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 12, 10, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Lure Stalk
+            ctx.strokeStyle = '#332211';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-6, -6); // From head
+            ctx.quadraticCurveTo(-15, -15, -20, -5);
+            ctx.stroke();
+
+            // Lure Bulb (Glows)
+            ctx.fillStyle = '#aaffaa';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ff00';
+            ctx.beginPath();
+            ctx.arc(-20, -5, 2.5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Teeth (Visible)
+            ctx.fillStyle = '#eeeeee';
+            ctx.beginPath();
+            ctx.moveTo(-10, 2); ctx.lineTo(-8, 6); ctx.lineTo(-6, 2);
+            ctx.moveTo(-5, 2); ctx.lineTo(-3, 7); ctx.lineTo(-1, 2);
+            ctx.moveTo(0, 2); ctx.lineTo(2, 6); ctx.lineTo(4, 2);
+            ctx.fill();
+
+        } else if (prey.type === PreyType.GULPER_EEL) {
+            // Gulper Eel Logic
+            ctx.rotate(Math.PI);
+            
+            // Giant Head/Mouth
+            ctx.fillStyle = '#080808';
+            ctx.beginPath();
+            ctx.ellipse(-5, 0, 10, 8, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // Jaw Line
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-15, 0); ctx.lineTo(5, 0);
+            ctx.stroke();
+
+            // Tail (Whip-like, undulating)
+            ctx.strokeStyle = '#080808';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(5, 0);
+            for(let t=0; t<10; t++) {
+               // Sine wave tail
+               const tailX = 5 + t * 5;
+               const tailY = Math.sin(time * 10 - t) * 4;
+               ctx.lineTo(tailX, tailY);
+            }
+            ctx.stroke();
+
+            // Tiny Eye
+            ctx.fillStyle = '#444';
+            ctx.beginPath(); ctx.arc(-10, -3, 1, 0, Math.PI*2); ctx.fill();
         }
 
         ctx.restore();
@@ -454,12 +532,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
 
       // --- 5. Titan Movement & Skinning ---
       
-      // MOVEMENT LOGIC (Hybrid: Keyboard + Mouse)
       const baseMoveSpeed = isRoaring ? 0.08 : 0.05; 
       let vx = 0;
       let vy = 0;
       
-      // Keyboard input
       const keys = keysRef.current;
       if (keys.has('ArrowUp')) vy -= 1;
       if (keys.has('ArrowDown')) vy += 1;
@@ -467,16 +543,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       if (keys.has('ArrowRight')) vx += 1;
 
       if (vx !== 0 || vy !== 0) {
-          // Keyboard driving
           const len = Math.hypot(vx, vy);
-          const kSpeed = isRoaring ? 8 : 4; // Absolute pixels/frame for keyboard
+          const kSpeed = isRoaring ? 8 : 4;
           titanRef.current.x += (vx / len) * kSpeed;
           titanRef.current.y += (vy / len) * kSpeed;
-          
-          // Sync mouse target so it doesn't snap back when keys released
           mouseRef.current = { ...titanRef.current };
       } else {
-          // Mouse/Touch driving
           const dx = mouseRef.current.x - titanRef.current.x;
           const dy = mouseRef.current.y - titanRef.current.y;
           titanRef.current.x += dx * baseMoveSpeed;
@@ -508,7 +580,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
         const tx = prevPos.x - Math.cos(angle) * segmentSize;
         const ty = prevPos.y - Math.sin(angle) * segmentSize;
         
-        // Fluid drag
         const drag = 0.4;
         const nx = currentPos.x + (tx - currentPos.x) * drag;
         const ny = currentPos.y + (ty - currentPos.y) * drag;
@@ -522,11 +593,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       // --- Rendering the Mosasaur Skin ---
       ctx.save();
       
-      // Dynamic Jaw Opening
       const jawOpenTarget = nearestPreyDist < 180 ? Math.min(1, (180 - nearestPreyDist) / 100) : 0;
       const jawAngle = 0.1 + (jawOpenTarget * 0.5) + (isRoaring ? 0.6 : 0);
 
-      // 1. Calculate ribs
       const leftPoints: Vector2[] = [];
       const rightPoints: Vector2[] = [];
       
@@ -555,14 +624,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
          });
       }
 
-      // 2. Draw Fins (Paddles)
+      // Draw Fins
       const drawFin = (spineIdx: number, size: number, isRight: boolean) => {
           if (!spine[spineIdx] || !spine[spineIdx+1]) return;
           const pos = spine[spineIdx];
           const angle = Math.atan2(spine[spineIdx].y - spine[spineIdx+1].y, spine[spineIdx].x - spine[spineIdx+1].x);
           const finAngle = angle + (isRight ? Math.PI/2 : -Math.PI/2) - (Math.sin(time * 5) * 0.2);
           
-          ctx.fillStyle = '#0f2430'; 
+          ctx.fillStyle = bioluminescence ? '#0f2430' : '#050a0d'; // Darker if no bio
           ctx.beginPath();
           ctx.moveTo(pos.x, pos.y);
           ctx.lineTo(pos.x + Math.cos(finAngle) * size, pos.y + Math.sin(finAngle) * size);
@@ -575,7 +644,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       drawFin(14, 60, true); 
       drawFin(14, 60, false); 
 
-      // 3. Draw Body Skin
+      // Draw Body Skin
       ctx.beginPath();
       ctx.moveTo(leftPoints[0].x, leftPoints[0].y);
       for(let i=1; i<leftPoints.length; i++) {
@@ -598,15 +667,43 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       }
       ctx.closePath();
 
+      // Adaptive Camouflage Skin Gradient
       const titanGrad = ctx.createLinearGradient(spine[0].x, spine[0].y, spine[spine.length-1].x, spine[spine.length-1].y);
-      titanGrad.addColorStop(0, '#1a2e3b'); 
-      titanGrad.addColorStop(0.5, '#0d161c'); 
-      titanGrad.addColorStop(1, '#080f14'); 
+      if (bioluminescence) {
+        // Active mode: Lighter, more detailed
+        titanGrad.addColorStop(0, '#1a2e3b'); 
+        titanGrad.addColorStop(0.5, '#0d161c'); 
+        titanGrad.addColorStop(1, '#080f14'); 
+      } else {
+        // Stealth/Camouflage mode: Very dark, blends with abyss
+        titanGrad.addColorStop(0, '#0a1014'); 
+        titanGrad.addColorStop(0.5, '#05080a'); 
+        titanGrad.addColorStop(1, '#020202'); 
+      }
       ctx.fillStyle = titanGrad;
       ctx.fill();
 
+      // Lateral Line System (Sensory Pores)
+      // Scientifically accurate: Deep sea fish use lateral lines to sense pressure.
+      // We visualize this as a faint row of dots along the flank.
+      ctx.fillStyle = bioluminescence ? 'rgba(100, 200, 255, 0.3)' : 'rgba(50, 100, 150, 0.1)';
+      for(let i=4; i<spine.length - 4; i+=2) {
+         if(!spine[i] || !spine[i+1]) continue;
+         // Calculate a point slightly offset from center towards 'top' (dorsal)
+         // But here we just put it on the spine for simplicity or slightly right
+         const angle = Math.atan2(spine[i+1].y - spine[i].y, spine[i+1].x - spine[i].x) + Math.PI/2;
+         const px = spine[i].x + Math.cos(angle) * 10;
+         const py = spine[i].y + Math.sin(angle) * 10;
+         
+         ctx.beginPath();
+         // Pulse effect
+         const r = 2 + Math.sin(time * 3 + i) * 1; 
+         ctx.arc(px, py, r, 0, Math.PI*2);
+         ctx.fill();
+      }
+
       // Scutes / Ridge
-      ctx.strokeStyle = '#233845';
+      ctx.strokeStyle = bioluminescence ? '#233845' : '#111820';
       ctx.lineWidth = 3;
       ctx.beginPath();
       for(let i=3; i<spine.length - 3; i++) {
@@ -621,7 +718,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       ctx.rotate(headAngle);
 
       // Lower Jaw
-      ctx.fillStyle = '#152026';
+      ctx.fillStyle = bioluminescence ? '#152026' : '#0a0f12';
       ctx.beginPath();
       ctx.rotate(jawAngle); 
       ctx.moveTo(0, 5);
@@ -643,7 +740,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       ctx.rotate(-jawAngle); 
 
       // Upper Jaw
-      ctx.fillStyle = '#1a2e3b';
+      ctx.fillStyle = bioluminescence ? '#1a2e3b' : '#0e151a';
       ctx.beginPath();
       ctx.rotate(-jawAngle * 0.3); 
       ctx.moveTo(0, -5);
@@ -664,8 +761,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       }
 
       // Eye
-      const eyeGlow = isRoaring ? '#ff3333' : '#ffff00';
-      ctx.shadowBlur = 15;
+      const eyeGlow = isRoaring ? '#ff3333' : (bioluminescence ? '#ffff00' : '#444400');
+      ctx.shadowBlur = bioluminescence ? 15 : 0;
       ctx.shadowColor = eyeGlow;
       ctx.fillStyle = eyeGlow;
       ctx.beginPath();

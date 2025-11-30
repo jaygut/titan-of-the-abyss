@@ -15,7 +15,9 @@ export interface Entity {
 export enum PreyType {
   LANTERNFISH = 'LANTERNFISH',
   AMMONITE = 'AMMONITE',
-  SQUID = 'SQUID'
+  SQUID = 'SQUID',
+  ANGLERFISH = 'ANGLERFISH',
+  GULPER_EEL = 'GULPER_EEL'
 }
 
 export interface PreyEntity extends Entity {
