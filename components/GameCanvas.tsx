@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { Vector2, Entity, Particle, SoundType, Jellyfish, Seaweed, PreyEntity, PreyType } from '../types';
+import { Vector2, Entity, Particle, SoundType, Jellyfish, Seaweed, PreyEntity, PreyType, Vent, Anemone } from '../types';
 import { soundService } from '../utils/soundService';
 
 interface GameCanvasProps {
@@ -20,6 +20,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
   const jellyfishRef = useRef<Jellyfish[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const seaweedRef = useRef<Seaweed[]>([]);
+  const ventsRef = useRef<Vent[]>([]);
+  const anemonesRef = useRef<Anemone[]>([]);
   const initializedRef = useRef(false);
   
   // Configuration
@@ -27,7 +29,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
   const SEGMENT_SPACING = 18;
   const PREY_COUNT = 35; 
   const JELLY_COUNT = 6;
-  const SEAWEED_COUNT = 40;
+  const SEAWEED_COUNT = 30;
+  const VENT_COUNT = 3;
+  const ANEMONE_COUNT = 15;
 
   // Initialize World
   useEffect(() => {
@@ -75,6 +79,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
     }
     seaweedRef.current = weeds;
 
+    // 5. Initialize Vents
+    const vents: Vent[] = [];
+    for (let i = 0; i < VENT_COUNT; i++) {
+      vents.push({
+        x: Math.random() * window.innerWidth,
+        height: 60 + Math.random() * 80,
+        width: 30 + Math.random() * 40
+      });
+    }
+    ventsRef.current = vents;
+
+    // 6. Initialize Anemones
+    const anemones: Anemone[] = [];
+    for (let i = 0; i < ANEMONE_COUNT; i++) {
+      anemones.push({
+        x: Math.random() * window.innerWidth,
+        radius: 10 + Math.random() * 10,
+        tentacleLength: 20 + Math.random() * 20,
+        color: `hsl(${Math.random() * 60 + 160}, 80%, 60%)`, // Cyan/Teal range
+        phaseOffset: Math.random() * Math.PI * 2
+      });
+    }
+    anemonesRef.current = anemones;
+
     initializedRef.current = true;
   }, []);
 
@@ -86,8 +114,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
           y: y ?? (Math.random() * window.innerHeight)
       };
 
-      if (rand < 0.45) {
-          // 45% Lanternfish
+      // Weights for spawn rates
+      if (rand < 0.35) {
+          // 35% Lanternfish
           return {
             id: Math.random().toString(36),
             type: PreyType.LANTERNFISH,
@@ -97,8 +126,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
             color: '#aaddff',
             angle: 0
           };
-      } else if (rand < 0.65) {
-          // 20% Ammonite (Slower, tankier)
+      } else if (rand < 0.50) {
+          // 15% Ammonite (Slower, tankier)
           return {
             id: Math.random().toString(36),
             type: PreyType.AMMONITE,
@@ -108,8 +137,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
             color: '#cdb499',
             angle: 0
           };
-      } else if (rand < 0.8) {
-          // 15% Vampire Squid (Drifts, bursts)
+      } else if (rand < 0.60) {
+          // 10% Vampire Squid (Drifts, bursts)
           return {
             id: Math.random().toString(36),
             type: PreyType.SQUID,
@@ -120,18 +149,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
             angle: 0,
             tailPhase: Math.random() * Math.PI
           };
-      } else if (rand < 0.9) {
-          // 10% Anglerfish (Lurker)
+      } else if (rand < 0.75) {
+          // 15% Anglerfish (Lurker) - INCREASED SIZE (Approx 1/3 Titan width)
           return {
             id: Math.random().toString(36),
             type: PreyType.ANGLERFISH,
             position: pos,
             velocity: { x: (Math.random() - 0.5) * 1, y: (Math.random() - 0.5) * 0.5 },
-            radius: 14,
+            radius: 28, // Significantly bigger
             color: '#221100',
             angle: 0
           };
-      } else {
+      } else if (rand < 0.85) {
           // 10% Gulper Eel (Serpentine)
           return {
             id: Math.random().toString(36),
@@ -142,6 +171,28 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
             color: '#111111',
             angle: 0,
             tailPhase: Math.random() * Math.PI
+          };
+      } else if (rand < 0.93) {
+          // 8% Lancetfish (Fast, large)
+          return {
+            id: Math.random().toString(36),
+            type: PreyType.LANCETFISH,
+            position: pos,
+            velocity: { x: (Math.random() - 0.5) * 5, y: (Math.random() - 0.5) * 3 },
+            radius: 18,
+            color: '#c0c0c0',
+            angle: 0
+          };
+      } else {
+          // 7% Coelacanth (Heavy tank)
+          return {
+            id: Math.random().toString(36),
+            type: PreyType.COELACANTH,
+            position: pos,
+            velocity: { x: (Math.random() - 0.5) * 1, y: (Math.random() - 0.5) * 0.5 },
+            radius: 25,
+            color: '#2a3b55',
+            angle: 0
           };
       }
   };
@@ -208,7 +259,72 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // --- 2. Flora (Tube Worms) ---
+      // --- 2. Flora (Vents, Anemones, Worms) ---
+      
+      // Hydrothermal Vents
+      ventsRef.current.forEach(vent => {
+         const bx = vent.x;
+         const by = canvas.height;
+         
+         // Draw Vent Stack
+         const ventGrad = ctx.createLinearGradient(bx, by - vent.height, bx, by);
+         ventGrad.addColorStop(0, '#333');
+         ventGrad.addColorStop(1, '#111');
+         ctx.fillStyle = ventGrad;
+         ctx.beginPath();
+         ctx.moveTo(bx - vent.width/2, by);
+         ctx.lineTo(bx - vent.width/4, by - vent.height);
+         ctx.lineTo(bx + vent.width/4, by - vent.height);
+         ctx.lineTo(bx + vent.width/2, by);
+         ctx.fill();
+
+         // Emit Particles (Smokers)
+         if (Math.random() < 0.2) {
+             particlesRef.current.push({
+                 id: `smoke-${Math.random()}`,
+                 position: { x: bx + (Math.random()-0.5)*10, y: by - vent.height },
+                 velocity: { x: (Math.random()-0.5)*0.5, y: -1 - Math.random() },
+                 life: 1.5,
+                 maxLife: 1.5,
+                 size: 4 + Math.random() * 6,
+                 color: 'rgba(20, 20, 20, 0.6)', // Dark smoke
+                 radius: 0
+             });
+         }
+      });
+
+      // Anemones
+      anemonesRef.current.forEach(anemone => {
+         const ax = anemone.x;
+         const ay = canvas.height;
+         
+         ctx.fillStyle = '#221122';
+         ctx.beginPath();
+         ctx.arc(ax, ay, anemone.radius, Math.PI, 0); // Dome base
+         ctx.fill();
+
+         ctx.strokeStyle = anemone.color;
+         ctx.lineWidth = 2;
+         ctx.shadowColor = anemone.color;
+         ctx.shadowBlur = bioluminescence ? 10 : 0;
+         
+         for(let i=0; i<12; i++) {
+            const angle = (Math.PI / 12) * i + Math.PI + (Math.PI/24);
+            const sway = Math.sin(time * 2 + anemone.phaseOffset + i) * 10;
+            ctx.beginPath();
+            ctx.moveTo(ax + Math.cos(angle)*anemone.radius*0.5, ay - Math.sin(angle)*2);
+            ctx.quadraticCurveTo(
+               ax + Math.cos(angle)*anemone.tentacleLength + sway, 
+               ay + Math.sin(angle)*anemone.tentacleLength - anemone.tentacleLength,
+               ax + Math.cos(angle)*anemone.tentacleLength + sway*1.5,
+               ay + Math.sin(angle)*anemone.tentacleLength - anemone.tentacleLength*1.5
+            );
+            ctx.stroke();
+         }
+         ctx.shadowBlur = 0;
+      });
+
+      // Tube Worms (Existing)
       ctx.lineWidth = 14;
       ctx.lineCap = 'round';
       seaweedRef.current.forEach(weed => {
@@ -288,7 +404,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
         if (distToHead < nearestPreyDist) nearestPreyDist = distToHead;
 
         // PREDATION: Eat check
-        // Larger prey needs slightly closer bite
         const biteRadius = prey.radius + 60; 
         if (distToHead < biteRadius) {
           soundService.play(SoundType.EAT);
@@ -298,11 +413,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
           if (prey.type === PreyType.SQUID) points = 2;
           if (prey.type === PreyType.ANGLERFISH) points = 4;
           if (prey.type === PreyType.GULPER_EEL) points = 5;
+          if (prey.type === PreyType.COELACANTH) points = 10;
+          if (prey.type === PreyType.LANCETFISH) points = 8;
 
           onScoreUpdate(points);
           
           // Blood/Debris
-          for(let k=0; k<6; k++) {
+          const pCount = prey.radius > 15 ? 12 : 6;
+          for(let k=0; k<pCount; k++) {
              particlesRef.current.push({
                id: Math.random().toString(),
                position: { ...prey.position },
@@ -317,21 +435,31 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
           return false; // Remove prey
         }
 
-        // Behavior: Flee or Move
+        // Behavior: Flee, Move or ATTRACT
         let fleeSpeed = 1.0;
-        if (prey.type === PreyType.AMMONITE || prey.type === PreyType.ANGLERFISH) fleeSpeed = 0.5;
-        if (prey.type === PreyType.SQUID || prey.type === PreyType.GULPER_EEL) fleeSpeed = 1.2;
+        if (prey.type === PreyType.AMMONITE || prey.type === PreyType.ANGLERFISH || prey.type === PreyType.COELACANTH) fleeSpeed = 0.5;
+        if (prey.type === PreyType.SQUID || prey.type === PreyType.GULPER_EEL || prey.type === PreyType.LANCETFISH) fleeSpeed = 1.3;
+
+        // ATTRACTION MECHANIC (The Lantern)
+        // If lantern is on, not roaring, and prey is in medium range
+        if (bioluminescence && !isRoaring && distToHead > 150 && distToHead < 600) {
+            // Stronger pull for smaller/phototactic prey
+            const attractionStrength = 0.05 * fleeSpeed;
+            prey.velocity.x -= (prey.position.x - titanHeadPos.x) / distToHead * attractionStrength;
+            prey.velocity.y -= (prey.position.y - titanHeadPos.y) / distToHead * attractionStrength;
+        }
 
         if (isRoaring) {
            prey.velocity.x += (prey.position.x - titanHeadPos.x) / distToHead * 1.5 * fleeSpeed;
            prey.velocity.y += (prey.position.y - titanHeadPos.y) / distToHead * 1.5 * fleeSpeed;
         } else if (distToHead < 300) {
+           // Normal proximity avoidance
            prey.velocity.x += (prey.position.x - titanHeadPos.x) / distToHead * 0.2 * fleeSpeed;
            prey.velocity.y += (prey.position.y - titanHeadPos.y) / distToHead * 0.2 * fleeSpeed;
         }
 
         // Natural movement updates
-        if (prey.type === PreyType.SQUID || prey.type === PreyType.GULPER_EEL) {
+        if (prey.type === PreyType.SQUID || prey.type === PreyType.GULPER_EEL || prey.type === PreyType.LANCETFISH) {
             // Bursts/Undulation
             if (Math.random() < 0.02) {
                 prey.velocity.x += (Math.random()-0.5) * 5;
@@ -349,7 +477,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
 
         // Min Speed Check
         const speed = Math.hypot(prey.velocity.x, prey.velocity.y);
-        const minSpeed = (prey.type === PreyType.AMMONITE || prey.type === PreyType.ANGLERFISH) ? 0.3 : 2;
+        const minSpeed = (prey.type === PreyType.AMMONITE || prey.type === PreyType.ANGLERFISH || prey.type === PreyType.COELACANTH) ? 0.3 : 2;
         if (speed < minSpeed) {
             prey.velocity.x += (Math.random() - 0.5) * 0.5;
             prey.velocity.y += (Math.random() - 0.5) * 0.5;
@@ -447,32 +575,35 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
             ctx.rotate(Math.PI);
             ctx.fillStyle = '#1a0a00'; // Dark brown
             ctx.beginPath();
-            ctx.ellipse(0, 0, 12, 10, 0, 0, Math.PI*2);
+            // SCALED UP BODY for visibility
+            ctx.ellipse(0, 0, prey.radius, prey.radius * 0.8, 0, 0, Math.PI*2);
             ctx.fill();
             
             // Lure Stalk
             ctx.strokeStyle = '#332211';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(-6, -6); // From head
-            ctx.quadraticCurveTo(-15, -15, -20, -5);
+            ctx.moveTo(-prey.radius/2, -prey.radius/2); 
+            ctx.quadraticCurveTo(-prey.radius*1.5, -prey.radius*1.5, -prey.radius*2, -prey.radius*0.5);
             ctx.stroke();
 
             // Lure Bulb (Glows)
-            ctx.fillStyle = '#aaffaa';
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#00ff00';
+            ctx.fillStyle = '#ccffcc';
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#55ff55';
             ctx.beginPath();
-            ctx.arc(-20, -5, 2.5, 0, Math.PI*2);
+            ctx.arc(-prey.radius*2, -prey.radius*0.5, 5, 0, Math.PI*2);
             ctx.fill();
             ctx.shadowBlur = 0;
 
             // Teeth (Visible)
             ctx.fillStyle = '#eeeeee';
+            const toothSize = 4;
             ctx.beginPath();
-            ctx.moveTo(-10, 2); ctx.lineTo(-8, 6); ctx.lineTo(-6, 2);
-            ctx.moveTo(-5, 2); ctx.lineTo(-3, 7); ctx.lineTo(-1, 2);
-            ctx.moveTo(0, 2); ctx.lineTo(2, 6); ctx.lineTo(4, 2);
+            // Upper
+            ctx.moveTo(-prey.radius + 5, 2); ctx.lineTo(-prey.radius + 10, 2 + toothSize); ctx.lineTo(-prey.radius + 15, 2);
+            // Lower
+            ctx.moveTo(-prey.radius + 8, -2); ctx.lineTo(-prey.radius + 12, -2 - toothSize); ctx.lineTo(-prey.radius + 18, -2);
             ctx.fill();
 
         } else if (prey.type === PreyType.GULPER_EEL) {
@@ -508,6 +639,83 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
             // Tiny Eye
             ctx.fillStyle = '#444';
             ctx.beginPath(); ctx.arc(-10, -3, 1, 0, Math.PI*2); ctx.fill();
+
+        } else if (prey.type === PreyType.COELACANTH) {
+            // Coelacanth (Ancient fish, bulky, multiple fins)
+            ctx.rotate(Math.PI);
+            ctx.fillStyle = '#2a3b55'; // Deep blue/slate
+            
+            // Body
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 20, 10, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // Scales texture (Cross hatch)
+            ctx.strokeStyle = '#3a4b65';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-10, -5); ctx.lineTo(0, 5);
+            ctx.moveTo(0, -8); ctx.lineTo(10, 2);
+            ctx.stroke();
+
+            // Lobed Fins (Distinctive trait)
+            const finWag = Math.sin(time * 4) * 0.2;
+            ctx.fillStyle = '#223344';
+            // Pectoral
+            ctx.beginPath(); ctx.ellipse(-5, 8, 6, 3, Math.PI/3 + finWag, 0, Math.PI*2); ctx.fill();
+            // Anal/Second dorsal
+            ctx.beginPath(); ctx.ellipse(10, 5, 5, 2, Math.PI/4 + finWag, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(10, -5, 5, 2, -Math.PI/4 - finWag, 0, Math.PI*2); ctx.fill();
+
+            // Trilobate Tail
+            ctx.beginPath();
+            ctx.moveTo(18, -4); ctx.lineTo(25, -6); ctx.lineTo(25, 6); ctx.lineTo(18, 4);
+            ctx.moveTo(25, -2); ctx.lineTo(30, 0); ctx.lineTo(25, 2); // Central lobe
+            ctx.fill();
+
+            // Eye
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(-12, -2, 2, 0, Math.PI*2); ctx.fill();
+
+        } else if (prey.type === PreyType.LANCETFISH) {
+            // Lancetfish (Long, thin, high dorsal fin)
+            ctx.rotate(Math.PI);
+            ctx.fillStyle = '#c0c0c0'; // Silver
+            
+            // Long Body
+            ctx.beginPath();
+            ctx.moveTo(-18, 0); // Nose
+            ctx.quadraticCurveTo(0, -6, 20, 0); // Back
+            ctx.quadraticCurveTo(0, 6, -18, 0); // Belly
+            ctx.fill();
+
+            // High Dorsal Sail
+            ctx.fillStyle = '#112233'; // Dark blue fin
+            ctx.beginPath();
+            ctx.moveTo(-10, -3);
+            ctx.lineTo(15, -3);
+            ctx.lineTo(5, -15); // High point
+            ctx.lineTo(-10, -3);
+            ctx.fill();
+
+            // Jaws (Long)
+            ctx.strokeStyle = '#a0a0a0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-18, 0); ctx.lineTo(-10, 0);
+            ctx.stroke();
+
+            // Tail
+            ctx.fillStyle = '#c0c0c0';
+            ctx.beginPath();
+            ctx.moveTo(20, 0); ctx.lineTo(28, -5); ctx.lineTo(25, 0); ctx.lineTo(28, 5);
+            ctx.fill();
+
+            // Big Eye
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(-12, -2, 3, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ffff00'; // Reflective eye
+            ctx.beginPath(); ctx.arc(-12, -2, 1.5, 0, Math.PI*2); ctx.fill();
         }
 
         ctx.restore();
@@ -683,23 +891,54 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       ctx.fillStyle = titanGrad;
       ctx.fill();
 
-      // Lateral Line System (Sensory Pores)
-      // Scientifically accurate: Deep sea fish use lateral lines to sense pressure.
-      // We visualize this as a faint row of dots along the flank.
-      ctx.fillStyle = bioluminescence ? 'rgba(100, 200, 255, 0.3)' : 'rgba(50, 100, 150, 0.1)';
+      // Lateral Line System (Sensory Pores) with Traveling Pulse
+      // Pulse calculation: A wave traveling from tail (index high) to head (index 0).
+      // spine.length is approx 24.
+      const pulseSpeed = 20.0;
+      // We want the peak to move from spine.length to 0.
+      const pulsePeriod = spine.length + 10;
+      const pulsePhase = (time * pulseSpeed) % pulsePeriod; 
+      // Current active index in the wave:
+      const activePulseIndex = pulsePeriod - pulsePhase;
+
       for(let i=4; i<spine.length - 4; i+=2) {
          if(!spine[i] || !spine[i+1]) continue;
-         // Calculate a point slightly offset from center towards 'top' (dorsal)
-         // But here we just put it on the spine for simplicity or slightly right
          const angle = Math.atan2(spine[i+1].y - spine[i].y, spine[i+1].x - spine[i].x) + Math.PI/2;
          const px = spine[i].x + Math.cos(angle) * 10;
          const py = spine[i].y + Math.sin(angle) * 10;
          
+         // Base sensory dot (Green fluorescent if active)
+         ctx.fillStyle = bioluminescence ? 'rgba(57, 255, 20, 0.3)' : 'rgba(50, 100, 150, 0.1)';
          ctx.beginPath();
-         // Pulse effect
          const r = 2 + Math.sin(time * 3 + i) * 1; 
          ctx.arc(px, py, r, 0, Math.PI*2);
          ctx.fill();
+
+         // Intermittent Flash Effect (Traversing Body) - NEON GREEN
+         if (bioluminescence) {
+             const distFromWave = Math.abs(i - activePulseIndex);
+             if (distFromWave < 4) {
+                 const intensity = (4 - distFromWave) / 4; // 0 to 1
+                 ctx.shadowBlur = 30 * intensity;
+                 ctx.shadowColor = '#39ff14'; // Neon Green
+                 ctx.fillStyle = `rgba(57, 255, 20, ${intensity})`;
+                 
+                 // Draw a glowing rib/stripe instead of just a dot for maximum impact
+                 const w = getWidth(i);
+                 ctx.beginPath();
+                 const pLeft = { x: spine[i].x + Math.cos(angle) * (w*0.8), y: spine[i].y + Math.sin(angle) * (w*0.8) };
+                 const pRight = { x: spine[i].x - Math.cos(angle) * (w*0.8), y: spine[i].y - Math.sin(angle) * (w*0.8) };
+                 
+                 // Draw curved stripe
+                 ctx.moveTo(pLeft.x, pLeft.y);
+                 ctx.quadraticCurveTo(spine[i].x, spine[i].y, pRight.x, pRight.y);
+                 ctx.strokeStyle = `rgba(57, 255, 20, ${intensity * 0.8})`;
+                 ctx.lineWidth = 6 * intensity;
+                 ctx.stroke();
+                 
+                 ctx.shadowBlur = 0;
+             }
+         }
       }
 
       // Scutes / Ridge
@@ -716,6 +955,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       ctx.save();
       ctx.translate(spine[0].x, spine[0].y);
       ctx.rotate(headAngle);
+
+      // --- TITAN LURE (Anglerfish style, Neon Green) ---
+      if (bioluminescence) {
+          const sway = Math.sin(time * 3) * 0.2;
+          ctx.strokeStyle = '#0a1a0a';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(0, -15); // Forehead
+          // Organic curve for stalk
+          ctx.bezierCurveTo(20, -60, 40 + Math.cos(time)*5, -80, 70 + Math.cos(time*0.8)*10, -50 + Math.sin(time)*10);
+          ctx.stroke();
+
+          // Bulb
+          const bulbX = 70 + Math.cos(time*0.8)*10;
+          const bulbY = -50 + Math.sin(time)*10;
+          
+          ctx.shadowBlur = 35;
+          ctx.shadowColor = '#39ff14'; // Neon Green Glow
+          ctx.fillStyle = '#ccffcc';
+          ctx.beginPath();
+          ctx.arc(bulbX, bulbY, 8, 0, Math.PI*2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+      }
 
       // Lower Jaw
       ctx.fillStyle = bioluminescence ? '#152026' : '#0a0f12';
@@ -761,7 +1024,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       }
 
       // Eye
-      const eyeGlow = isRoaring ? '#ff3333' : (bioluminescence ? '#ffff00' : '#444400');
+      const eyeGlow = isRoaring ? '#ff3333' : (bioluminescence ? '#39ff14' : '#444400'); // Green if passive
       ctx.shadowBlur = bioluminescence ? 15 : 0;
       ctx.shadowColor = eyeGlow;
       ctx.fillStyle = eyeGlow;

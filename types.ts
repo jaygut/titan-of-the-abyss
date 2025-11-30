@@ -17,7 +17,9 @@ export enum PreyType {
   AMMONITE = 'AMMONITE',
   SQUID = 'SQUID',
   ANGLERFISH = 'ANGLERFISH',
-  GULPER_EEL = 'GULPER_EEL'
+  GULPER_EEL = 'GULPER_EEL',
+  COELACANTH = 'COELACANTH',
+  LANCETFISH = 'LANCETFISH'
 }
 
 export interface PreyEntity extends Entity {
@@ -40,6 +42,20 @@ export interface Seaweed {
   x: number;
   height: number;
   segments: number;
+  color: string;
+  phaseOffset: number;
+}
+
+export interface Vent {
+  x: number;
+  height: number;
+  width: number;
+}
+
+export interface Anemone {
+  x: number;
+  radius: number;
+  tentacleLength: number;
   color: string;
   phaseOffset: number;
 }
