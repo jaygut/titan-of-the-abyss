@@ -1,14 +1,15 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { Vector2, Entity, Particle, SoundType, Jellyfish, Seaweed, PreyEntity, PreyType, Vent, Anemone } from '../types';
+import { Vector2, Entity, Particle, SoundType, Jellyfish, Seaweed, PreyEntity, PreyType, Vent, Anemone, CreatureType } from '../types';
 import { soundService } from '../utils/soundService';
 
 interface GameCanvasProps {
   onScoreUpdate: (score: number) => void;
   isRoaring: boolean;
   bioluminescence: boolean;
+  creatureType: CreatureType;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, bioluminescence }) => {
+const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, bioluminescence, creatureType }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef<Vector2>({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   const keysRef = useRef<Set<string>>(new Set());
@@ -404,7 +405,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
         if (distToHead < nearestPreyDist) nearestPreyDist = distToHead;
 
         // PREDATION: Eat check
-        const biteRadius = prey.radius + 60; 
+        // Adjust bite radius slightly for Kaiju
+        const biteRadius = creatureType === CreatureType.KAIJU ? prey.radius + 80 : prey.radius + 60; 
+        
         if (distToHead < biteRadius) {
           soundService.play(SoundType.EAT);
           // Score depends on type
@@ -442,6 +445,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
 
         // ATTRACTION MECHANIC (The Lantern)
         // If lantern is on, not roaring, and prey is in medium range
+        // Kaiju also has lantern attraction via spines
         if (bioluminescence && !isRoaring && distToHead > 150 && distToHead < 600) {
             // Stronger pull for smaller/phototactic prey
             const attractionStrength = 0.05 * fleeSpeed;
@@ -798,7 +802,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       }
       titanBodyRef.current = newBody;
 
-      // --- Rendering the Mosasaur Skin ---
+      // --- Rendering the Creature Skin ---
       ctx.save();
       
       const jawOpenTarget = nearestPreyDist < 180 ? Math.min(1, (180 - nearestPreyDist) / 100) : 0;
@@ -807,10 +811,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       const leftPoints: Vector2[] = [];
       const rightPoints: Vector2[] = [];
       
+      // KAIJU: Wider body
       const getWidth = (i: number) => {
-        if (i < 4) return 30 + i * 8; 
-        if (i < 12) return 60 + Math.sin(i * 0.3) * 10;
-        return Math.max(5, 60 - (i-12) * 5); 
+        if (creatureType === CreatureType.KAIJU) {
+           if (i < 5) return 40 + i * 8; 
+           if (i < 15) return 80 + Math.sin(i * 0.3) * 10;
+           return Math.max(15, 70 - (i-15) * 6);
+        } else {
+           // MOSASAUR
+           if (i < 4) return 30 + i * 8; 
+           if (i < 12) return 60 + Math.sin(i * 0.3) * 10;
+           return Math.max(5, 60 - (i-12) * 5); 
+        }
       };
 
       for(let i=0; i<spine.length; i++) {
@@ -832,25 +844,51 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
          });
       }
 
-      // Draw Fins
-      const drawFin = (spineIdx: number, size: number, isRight: boolean) => {
+      // Draw Limbs (Fins or Claws)
+      const drawLimb = (spineIdx: number, size: number, isRight: boolean) => {
           if (!spine[spineIdx] || !spine[spineIdx+1]) return;
           const pos = spine[spineIdx];
           const angle = Math.atan2(spine[spineIdx].y - spine[spineIdx+1].y, spine[spineIdx].x - spine[spineIdx+1].x);
-          const finAngle = angle + (isRight ? Math.PI/2 : -Math.PI/2) - (Math.sin(time * 5) * 0.2);
+          const limbAngle = angle + (isRight ? Math.PI/2 : -Math.PI/2) - (Math.sin(time * 5) * 0.2);
           
-          ctx.fillStyle = bioluminescence ? '#0f2430' : '#050a0d'; // Darker if no bio
+          ctx.fillStyle = bioluminescence ? (creatureType === CreatureType.KAIJU ? '#1a201a' : '#0f2430') : '#050a0d';
           ctx.beginPath();
-          ctx.moveTo(pos.x, pos.y);
-          ctx.lineTo(pos.x + Math.cos(finAngle) * size, pos.y + Math.sin(finAngle) * size);
-          ctx.lineTo(pos.x + Math.cos(finAngle - 0.5) * (size*0.6), pos.y + Math.sin(finAngle - 0.5) * (size*0.6));
-          ctx.fill();
+
+          if (creatureType === CreatureType.KAIJU) {
+             // CLAW ARM
+             const elbowX = pos.x + Math.cos(limbAngle) * size * 0.6;
+             const elbowY = pos.y + Math.sin(limbAngle) * size * 0.6;
+             const handX = elbowX + Math.cos(limbAngle + (isRight?0.5:-0.5)) * size * 0.5;
+             const handY = elbowY + Math.sin(limbAngle + (isRight?0.5:-0.5)) * size * 0.5;
+             
+             ctx.lineWidth = 15;
+             ctx.strokeStyle = ctx.fillStyle as string;
+             ctx.moveTo(pos.x, pos.y);
+             ctx.lineTo(elbowX, elbowY);
+             ctx.lineTo(handX, handY);
+             ctx.stroke();
+
+             // Claws
+             ctx.fillStyle = '#111';
+             ctx.beginPath();
+             ctx.moveTo(handX, handY);
+             ctx.lineTo(handX + Math.cos(limbAngle)*20, handY + Math.sin(limbAngle)*20);
+             ctx.lineTo(handX + Math.cos(limbAngle + (isRight?0.5:-0.5))*10, handY + Math.sin(limbAngle + (isRight?0.5:-0.5))*10);
+             ctx.fill();
+
+          } else {
+             // MOSASAUR PADDLE
+             ctx.moveTo(pos.x, pos.y);
+             ctx.lineTo(pos.x + Math.cos(limbAngle) * size, pos.y + Math.sin(limbAngle) * size);
+             ctx.lineTo(pos.x + Math.cos(limbAngle - 0.5) * (size*0.6), pos.y + Math.sin(limbAngle - 0.5) * (size*0.6));
+             ctx.fill();
+          }
       };
       
-      drawFin(4, 90, true); 
-      drawFin(4, 90, false); 
-      drawFin(14, 60, true); 
-      drawFin(14, 60, false); 
+      drawLimb(4, creatureType === CreatureType.KAIJU ? 80 : 90, true); 
+      drawLimb(4, creatureType === CreatureType.KAIJU ? 80 : 90, false); 
+      drawLimb(14, 60, true); 
+      drawLimb(14, 60, false); 
 
       // Draw Body Skin
       ctx.beginPath();
@@ -878,12 +916,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       // Adaptive Camouflage Skin Gradient
       const titanGrad = ctx.createLinearGradient(spine[0].x, spine[0].y, spine[spine.length-1].x, spine[spine.length-1].y);
       if (bioluminescence) {
-        // Active mode: Lighter, more detailed
-        titanGrad.addColorStop(0, '#1a2e3b'); 
-        titanGrad.addColorStop(0.5, '#0d161c'); 
-        titanGrad.addColorStop(1, '#080f14'); 
+        if (creatureType === CreatureType.KAIJU) {
+            // Kaiju is darker, slightly green/charcoal
+            titanGrad.addColorStop(0, '#151a15'); 
+            titanGrad.addColorStop(0.5, '#0a100a'); 
+            titanGrad.addColorStop(1, '#050505'); 
+        } else {
+            // Mosasaur is slate blue
+            titanGrad.addColorStop(0, '#1a2e3b'); 
+            titanGrad.addColorStop(0.5, '#0d161c'); 
+            titanGrad.addColorStop(1, '#080f14'); 
+        }
       } else {
-        // Stealth/Camouflage mode: Very dark, blends with abyss
+        // Stealth
         titanGrad.addColorStop(0, '#0a1014'); 
         titanGrad.addColorStop(0.5, '#05080a'); 
         titanGrad.addColorStop(1, '#020202'); 
@@ -891,72 +936,109 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       ctx.fillStyle = titanGrad;
       ctx.fill();
 
-      // Lateral Line System (Sensory Pores) with Traveling Pulse
-      // Pulse calculation: A wave traveling from tail (index high) to head (index 0).
-      // spine.length is approx 24.
-      const pulseSpeed = 20.0;
-      // We want the peak to move from spine.length to 0.
-      const pulsePeriod = spine.length + 10;
-      const pulsePhase = (time * pulseSpeed) % pulsePeriod; 
-      // Current active index in the wave:
-      const activePulseIndex = pulsePeriod - pulsePhase;
+      // KAIJU: Dorsal Plates (Spikes)
+      if (creatureType === CreatureType.KAIJU) {
+          for(let i=2; i<spine.length-3; i+=2) {
+              if(!spine[i] || !spine[i+1]) continue;
+              const angle = Math.atan2(spine[i+1].y - spine[i].y, spine[i+1].x - spine[i].x) + Math.PI/2;
+              
+              // Spikes are "above" the spine (opposite to belly, usually index 0 is head, assuming spine moves 'backwards')
+              // Need to check orientation. Normal angle points sideways. We want 'up' relative to spine.
+              // Actually, simplified: Draw centered on spine, protruding 'up' in Z-axis (visually, maybe just darker jagged shapes on top)
+              // Or better, distinct spikes protruding from the back.
+              
+              // Let's draw glowing dorsal plates along the spine center
+              const spikeSize = 15 + Math.sin(i)*5;
+              ctx.save();
+              ctx.translate(spine[i].x, spine[i].y);
+              ctx.rotate(angle - Math.PI/2); // Align with spine direction
+              
+              ctx.fillStyle = bioluminescence ? '#001100' : '#000';
+              ctx.beginPath();
+              ctx.moveTo(-5, 0);
+              ctx.lineTo(0, -spikeSize); // Stick out
+              ctx.lineTo(5, 0);
+              ctx.fill();
 
-      for(let i=4; i<spine.length - 4; i+=2) {
-         if(!spine[i] || !spine[i+1]) continue;
-         const angle = Math.atan2(spine[i+1].y - spine[i].y, spine[i+1].x - spine[i].x) + Math.PI/2;
-         const px = spine[i].x + Math.cos(angle) * 10;
-         const py = spine[i].y + Math.sin(angle) * 10;
-         
-         // Base sensory dot (Green fluorescent if active)
-         ctx.fillStyle = bioluminescence ? 'rgba(57, 255, 20, 0.3)' : 'rgba(50, 100, 150, 0.1)';
-         ctx.beginPath();
-         const r = 2 + Math.sin(time * 3 + i) * 1; 
-         ctx.arc(px, py, r, 0, Math.PI*2);
-         ctx.fill();
-
-         // Intermittent Flash Effect (Traversing Body) - NEON GREEN
-         if (bioluminescence) {
-             const distFromWave = Math.abs(i - activePulseIndex);
-             if (distFromWave < 4) {
-                 const intensity = (4 - distFromWave) / 4; // 0 to 1
-                 ctx.shadowBlur = 30 * intensity;
-                 ctx.shadowColor = '#39ff14'; // Neon Green
-                 ctx.fillStyle = `rgba(57, 255, 20, ${intensity})`;
-                 
-                 // Draw a glowing rib/stripe instead of just a dot for maximum impact
-                 const w = getWidth(i);
-                 ctx.beginPath();
-                 const pLeft = { x: spine[i].x + Math.cos(angle) * (w*0.8), y: spine[i].y + Math.sin(angle) * (w*0.8) };
-                 const pRight = { x: spine[i].x - Math.cos(angle) * (w*0.8), y: spine[i].y - Math.sin(angle) * (w*0.8) };
-                 
-                 // Draw curved stripe
-                 ctx.moveTo(pLeft.x, pLeft.y);
-                 ctx.quadraticCurveTo(spine[i].x, spine[i].y, pRight.x, pRight.y);
-                 ctx.strokeStyle = `rgba(57, 255, 20, ${intensity * 0.8})`;
-                 ctx.lineWidth = 6 * intensity;
-                 ctx.stroke();
-                 
-                 ctx.shadowBlur = 0;
-             }
-         }
+              // Glow inside plate
+              if (bioluminescence) {
+                  const pulse = Math.sin(time * 10 - i * 0.5); // Travel wave
+                  if (pulse > 0) {
+                      ctx.shadowBlur = 15 * pulse;
+                      ctx.shadowColor = '#39ff14';
+                      ctx.fillStyle = `rgba(57, 255, 20, ${pulse * 0.8})`;
+                      ctx.beginPath();
+                      ctx.moveTo(-2, 0);
+                      ctx.lineTo(0, -spikeSize * 0.8);
+                      ctx.lineTo(2, 0);
+                      ctx.fill();
+                      ctx.shadowBlur = 0;
+                  }
+              }
+              ctx.restore();
+          }
       }
 
-      // Scutes / Ridge
-      ctx.strokeStyle = bioluminescence ? '#233845' : '#111820';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      for(let i=3; i<spine.length - 3; i++) {
-         ctx.moveTo(spine[i].x, spine[i].y);
-         ctx.lineTo(spine[i+1].x, spine[i+1].y);
+      // Lateral Line / Bio Pulse (Only for Mosasaur, Kaiju has plates)
+      if (creatureType === CreatureType.MOSASAUR) {
+        const pulsePeriod = spine.length + 10;
+        const pulsePhase = (time * 20.0) % pulsePeriod; 
+        const activePulseIndex = pulsePeriod - pulsePhase;
+
+        for(let i=4; i<spine.length - 4; i+=2) {
+            if(!spine[i] || !spine[i+1]) continue;
+            const angle = Math.atan2(spine[i+1].y - spine[i].y, spine[i+1].x - spine[i].x) + Math.PI/2;
+            const px = spine[i].x + Math.cos(angle) * 10;
+            const py = spine[i].y + Math.sin(angle) * 10;
+            
+            ctx.fillStyle = bioluminescence ? 'rgba(57, 255, 20, 0.3)' : 'rgba(50, 100, 150, 0.1)';
+            ctx.beginPath();
+            const r = 2 + Math.sin(time * 3 + i) * 1; 
+            ctx.arc(px, py, r, 0, Math.PI*2);
+            ctx.fill();
+
+            if (bioluminescence) {
+                const distFromWave = Math.abs(i - activePulseIndex);
+                if (distFromWave < 4) {
+                    const intensity = (4 - distFromWave) / 4; 
+                    ctx.shadowBlur = 30 * intensity;
+                    ctx.shadowColor = '#39ff14'; 
+                    ctx.fillStyle = `rgba(57, 255, 20, ${intensity})`;
+                    
+                    const w = getWidth(i);
+                    ctx.beginPath();
+                    const pLeft = { x: spine[i].x + Math.cos(angle) * (w*0.8), y: spine[i].y + Math.sin(angle) * (w*0.8) };
+                    const pRight = { x: spine[i].x - Math.cos(angle) * (w*0.8), y: spine[i].y - Math.sin(angle) * (w*0.8) };
+                    
+                    ctx.moveTo(pLeft.x, pLeft.y);
+                    ctx.quadraticCurveTo(spine[i].x, spine[i].y, pRight.x, pRight.y);
+                    ctx.strokeStyle = `rgba(57, 255, 20, ${intensity * 0.8})`;
+                    ctx.lineWidth = 6 * intensity;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
       }
-      ctx.stroke();
+
+      // Scutes / Ridge (Shared)
+      if (creatureType === CreatureType.MOSASAUR) {
+        ctx.strokeStyle = bioluminescence ? '#233845' : '#111820';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for(let i=3; i<spine.length - 3; i++) {
+           ctx.moveTo(spine[i].x, spine[i].y);
+           ctx.lineTo(spine[i+1].x, spine[i+1].y);
+        }
+        ctx.stroke();
+      }
 
       // 4. Draw Head
       ctx.save();
       ctx.translate(spine[0].x, spine[0].y);
       ctx.rotate(headAngle);
 
-      // --- TITAN LURE (Anglerfish style, Neon Green) ---
+      // --- TITAN LURE (Shared) ---
       if (bioluminescence) {
           const sway = Math.sin(time * 3) * 0.2;
           ctx.strokeStyle = '#0a1a0a';
@@ -980,14 +1062,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
           ctx.shadowBlur = 0;
       }
 
+      // KAIJU HEAD: Boxier, shorter
+      const headLength = creatureType === CreatureType.KAIJU ? 50 : 60;
+      const headWidth = creatureType === CreatureType.KAIJU ? 35 : 25;
+
       // Lower Jaw
-      ctx.fillStyle = bioluminescence ? '#152026' : '#0a0f12';
+      ctx.fillStyle = bioluminescence ? (creatureType===CreatureType.KAIJU?'#111':'#152026') : '#0a0f12';
       ctx.beginPath();
       ctx.rotate(jawAngle); 
       ctx.moveTo(0, 5);
-      ctx.lineTo(50, 8);
-      ctx.lineTo(55, 15);
-      ctx.lineTo(10, 25);
+      ctx.lineTo(headLength - 10, 8);
+      ctx.lineTo(headLength, 15);
+      ctx.lineTo(10, headWidth);
       ctx.closePath();
       ctx.fill();
       
@@ -1003,13 +1089,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       ctx.rotate(-jawAngle); 
 
       // Upper Jaw
-      ctx.fillStyle = bioluminescence ? '#1a2e3b' : '#0e151a';
+      ctx.fillStyle = bioluminescence ? (creatureType===CreatureType.KAIJU?'#182218':'#1a2e3b') : '#0e151a';
       ctx.beginPath();
       ctx.rotate(-jawAngle * 0.3); 
       ctx.moveTo(0, -5);
-      ctx.lineTo(60, -10); 
-      ctx.lineTo(55, -25); 
-      ctx.lineTo(10, -35); 
+      ctx.lineTo(headLength, -10); 
+      ctx.lineTo(headLength - 5, -headWidth); 
+      ctx.lineTo(10, -headWidth - 10); 
       ctx.closePath();
       ctx.fill();
 
@@ -1036,7 +1122,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       // Nostril
       ctx.fillStyle = '#000';
       ctx.beginPath();
-      ctx.ellipse(45, -18, 2, 1, 0, 0, Math.PI*2);
+      ctx.ellipse(headLength - 15, -18, 2, 1, 0, 0, Math.PI*2);
       ctx.fill();
 
       ctx.restore(); 
@@ -1083,7 +1169,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onScoreUpdate, isRoaring, biolu
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [onScoreUpdate, isRoaring, bioluminescence]);
+  }, [onScoreUpdate, isRoaring, bioluminescence, creatureType]);
 
   return <canvas ref={canvasRef} className="absolute inset-0 z-0 block" />;
 };

@@ -12,6 +12,11 @@ export interface Entity {
   angle?: number; // For orientation
 }
 
+export enum CreatureType {
+  MOSASAUR = 'MOSASAUR',
+  KAIJU = 'KAIJU'
+}
+
 export enum PreyType {
   LANTERNFISH = 'LANTERNFISH',
   AMMONITE = 'AMMONITE',

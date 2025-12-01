@@ -3,13 +3,14 @@ import GameCanvas from './components/GameCanvas';
 import CausticsLayer from './components/CausticsLayer';
 import Controls from './components/Controls';
 import { soundService } from './utils/soundService';
-import { SoundType } from './types';
+import { SoundType, CreatureType } from './types';
 
 const App: React.FC = () => {
   const [score, setScore] = useState(0);
   const [isRoaring, setIsRoaring] = useState(false);
   const [bioluminescence, setBioluminescence] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
+  const [creatureType, setCreatureType] = useState<CreatureType>(CreatureType.MOSASAUR);
 
   // Initialize Audio on first interaction
   const startGame = () => {
@@ -35,6 +36,11 @@ const App: React.FC = () => {
   const handleToggleBio = useCallback(() => {
     setBioluminescence(prev => !prev);
     // soundService.play(SoundType.SWITCH); // Optional
+  }, []);
+
+  const handleMutate = useCallback(() => {
+    setCreatureType(prev => prev === CreatureType.MOSASAUR ? CreatureType.KAIJU : CreatureType.MOSASAUR);
+    soundService.play(SoundType.ROAR); // Roar on transform
   }, []);
 
   const handleScoreUpdate = useCallback((points: number) => {
@@ -79,6 +85,7 @@ const App: React.FC = () => {
           onScoreUpdate={handleScoreUpdate}
           isRoaring={isRoaring}
           bioluminescence={bioluminescence}
+          creatureType={creatureType}
         />
       </div>
 
@@ -91,9 +98,11 @@ const App: React.FC = () => {
           onRoar={handleRoar}
           onToggleBio={handleToggleBio}
           onSonar={handleSonar}
+          onMutate={handleMutate}
           isRoaring={isRoaring}
           bioluminescence={bioluminescence}
           score={score}
+          creatureType={creatureType}
         />
       )}
 
